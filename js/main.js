@@ -184,6 +184,14 @@
   let carouselTimer;
   let lbItems = [];
 
+  // Lightbox elements & state
+  const lb = $('#lb');
+  const ls = $('#lbs');
+  let lbIdx = 0;
+  let zoom = 1;
+  let tx = 0;
+  let ty = 0;
+
   function renderCarousel(galleryList) {
     const cv = $('#cv');
     if (!cv) return;
@@ -203,7 +211,6 @@
 
     its = $$('.it');
 
-    const ls = $('#lbs');
     if (ls && its.length) {
       ls.innerHTML = '';
       lbItems = its.map(el => {
@@ -440,41 +447,82 @@
   /* -------------------------------------------------------------
      10. Contact Form Submission (Direct to Dashboard & Google Sheets)
      ------------------------------------------------------------- */
-  const fm = $('#fm');
-  const ok = $('#ok');
-  const btnSub = $('#btn-submit-enquiry');
-  const enqModal = $('#enq-modal');
-  const modalDesc = $('#modal-desc');
-  const modalClose = $('#modal-close-btn');
+  (function initEnquiryForm() {
+    const fm = $('#fm');
+    const ok = $('#ok');
+    const btnSub = $('#btn-submit-enquiry');
+    const enqModal = $('#enq-modal');
+    const modalDesc = $('#modal-desc');
+    const modalClose = $('#modal-close-btn');
 
-  const closeModal = () => {
-    if (enqModal) {
-      enqModal.classList.remove('active');
-      setTimeout(() => { enqModal.style.display = 'none'; }, 300);
-    }
-  };
-
-  if (modalClose) modalClose.onclick = closeModal;
-  if (enqModal) {
-    enqModal.onclick = (e) => {
-      if (e.target === enqModal) closeModal();
+    const closeModal = () => {
+      if (enqModal) {
+        enqModal.classList.remove('active');
+        setTimeout(() => { enqModal.style.display = 'none'; }, 250);
+      }
     };
-  }
 
-  if (fm) {
-    fm.onsubmit = function (e) {
-      e.preventDefault();
+    if (modalClose) modalClose.addEventListener('click', closeModal);
+    if (enqModal) {
+      enqModal.addEventListener('click', (e) => {
+        if (e.target === enqModal) closeModal();
+      });
+    }
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+    });
 
-      const name = ($('#fn')?.value || '').trim();
-      const phone = ($('#ph')?.value || '').trim();
-      const email = ($('#em')?.value || '').trim();
-      const service = ($('#sv')?.value || 'Residential construction').trim();
-      const msg = ($('#ms')?.value || '').trim();
+    if (!fm) return;
 
-      if (!name || !phone) {
-        alert('Please enter your name and phone number so we can get in touch.');
+    let isSubmitting = false;
+
+    function handleSubmission(e) {
+      if (e) e.preventDefault();
+      if (isSubmitting) return;
+
+      const fnInput = $('#fn');
+      const phInput = $('#ph');
+      const emInput = $('#em');
+      const svInput = $('#sv');
+      const msInput = $('#ms');
+
+      const name = (fnInput ? fnInput.value : '').trim();
+      const phone = (phInput ? phInput.value : '').trim();
+      const email = (emInput ? emInput.value : '').trim();
+      const service = (svInput ? svInput.value : 'Residential construction').trim();
+      const msg = (msInput ? msInput.value : '').trim();
+
+      // Clear previous error state
+      if (fnInput) fnInput.style.borderColor = '';
+      if (phInput) phInput.style.borderColor = '';
+
+      if (!name) {
+        if (fnInput) {
+          fnInput.style.borderColor = '#ef4444';
+          fnInput.focus();
+        }
+        if (ok) {
+          ok.style.display = 'block';
+          ok.style.color = '#f87171';
+          ok.innerHTML = '⚠️ Please enter your name.';
+        }
         return;
       }
+
+      if (!phone || phone.length < 5) {
+        if (phInput) {
+          phInput.style.borderColor = '#ef4444';
+          phInput.focus();
+        }
+        if (ok) {
+          ok.style.display = 'block';
+          ok.style.color = '#f87171';
+          ok.innerHTML = '⚠️ Please enter a valid phone number.';
+        }
+        return;
+      }
+
+      isSubmitting = true;
 
       const enquiryData = {
         id: Date.now().toString(),
@@ -488,45 +536,64 @@
         notes: ''
       };
 
-      // 1. Immediately store in local database (instant 0ms)
+      // 1. Immediately store in local database
       try {
         const list = JSON.parse(localStorage.getItem('wsite_enq') || '[]');
         list.unshift(enquiryData);
         localStorage.setItem('wsite_enq', JSON.stringify(list));
+      } catch (err) {
+        console.warn('Local save warning:', err);
+      }
+
+      // 2. Immediately reset form inputs
+      try {
+        fm.reset();
       } catch (err) {}
 
-      // 2. Immediately reset the form inputs
-      fm.reset();
-
-      // 3. Immediately show confirmation popup modal
+      // 3. Immediately display confirmation popup modal
       if (modalDesc) {
         modalDesc.innerHTML = `Thank you, <strong>${escapeHtml(name)}</strong>! Your enquiry for <strong>${escapeHtml(service)}</strong> has been received directly by our team. We will call you at <strong>${escapeHtml(phone)}</strong> shortly.`;
       }
       if (enqModal) {
         enqModal.style.display = 'flex';
+        // Trigger reflow for smooth animation
+        void enqModal.offsetWidth;
         enqModal.classList.add('active');
       }
 
-      // 4. Also show green success text right under the button
+      // 4. Show green success text under button as secondary confirmation
       if (ok) {
         ok.style.display = 'block';
         ok.style.color = '#4ade80';
-        ok.innerHTML = `✔ <strong>Enquiry Submitted!</strong> Thank you ${escapeHtml(name)}, we will call you shortly.`;
+        ok.innerHTML = `✔ <strong>Enquiry Submitted!</strong> Thank you ${escapeHtml(name)}, we will contact you shortly.`;
       }
 
-      // 5. Restore submit button state
-      if (btnSub) {
-        btnSub.disabled = false;
-        btnSub.textContent = 'Submit Enquiry';
-      }
+      // 5. Reset submission lock after brief delay
+      setTimeout(() => {
+        isSubmitting = false;
+        if (btnSub) {
+          btnSub.disabled = false;
+          btnSub.textContent = 'Submit Enquiry';
+        }
+      }, 1000);
 
-      // 6. Asynchronously dispatch to Google Sheets in background (Non-blocking!)
-      if (window.AmbaraSheets && window.AmbaraSheets.saveEnquiry) {
+      // 6. Asynchronously sync to Google Sheets in background
+      if (window.AmbaraSheets && typeof window.AmbaraSheets.saveEnquiry === 'function') {
         window.AmbaraSheets.saveEnquiry(enquiryData).catch(function (err) {
-          console.warn('Background sync:', err);
+          console.warn('Background sync status:', err);
         });
       }
-    };
-  }
+    }
+
+    fm.addEventListener('submit', handleSubmission);
+    if (btnSub) {
+      btnSub.addEventListener('click', (e) => {
+        // If button is clicked directly and submit doesn't fire
+        if (!isSubmitting) {
+          handleSubmission(e);
+        }
+      });
+    }
+  })();
 
 })();

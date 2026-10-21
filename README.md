@@ -36,25 +36,6 @@ Ambara/
 
 ---
 
-## 🚀 Quick Setup
-
-1. **Configure APIs (`js/config.js`)**:
-   Open `js/config.js` and paste your Google Apps Script Web App URL and Cloudinary credentials:
-   ```javascript
-   window.AMBARA_CONFIG = {
-     GOOGLE_SHEETS_URL: "https://script.google.com/macros/s/.../exec",
-     CLOUDINARY_CLOUD_NAME: "your-cloud-name",
-     CLOUDINARY_UPLOAD_PRESET: "your-upload-preset"
-   };
-   ```
-
-2. **Launch Website**:
-   Open `index.html` in any browser or launch with Live Server.
-
-3. **Access Admin Portal**:
-   Open `admin.html` and log in with default credentials (`ambara123`).
-
----
 
 ## 🛠️ Built With
 

@@ -9,6 +9,7 @@
   'use strict';
 
   var STORAGE_KEY_ENQ = 'wsite_enq';
+  var STORAGE_KEY_PROJ = 'wsite_proj';
 
   var AmbaraSheets = {
     /**
@@ -165,6 +166,101 @@
       } catch (err) {
         console.warn('Could not sync update to Google Sheets:', err);
       }
+    },
+
+    /**
+     * Save a project to Google Sheets & local cache
+     */
+    saveProject: async function (project) {
+      if (!project.id) project.id = Date.now().toString();
+      if (!project.cat) project.cat = 'Completed';
+      if (project.on === undefined) project.on = true;
+
+      // 1. Immediately store in localStorage
+      try {
+        var list = JSON.parse(localStorage.getItem(STORAGE_KEY_PROJ) || '[]');
+        var idx = list.findIndex(function (x) { return String(x.id) === String(project.id); });
+        if (idx > -1) {
+          list[idx] = Object.assign({}, list[idx], project);
+        } else {
+          list.push(project);
+        }
+        // Ensure no base64
+        var clean = list.filter(function (p) { return p.img && !p.img.startsWith('data:'); });
+        localStorage.setItem(STORAGE_KEY_PROJ, JSON.stringify(clean));
+      } catch (e) {}
+
+      // 2. Sync to Google Sheets
+      var url = this.getUrl();
+      if (!url) return { ok: true, source: 'local' };
+
+      try {
+        var payload = Object.assign({ action: 'save_project' }, project);
+        await fetch(url, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
+        });
+        return { ok: true, source: 'cloud' };
+      } catch (err) {
+        console.warn('Could not sync project to Google Sheets:', err);
+        return { ok: true, source: 'local' };
+      }
+    },
+
+    /**
+     * Fetch projects from Google Sheets
+     */
+    fetchProjects: async function () {
+      var url = this.getUrl();
+      if (!url) {
+        var localProjects = JSON.parse(localStorage.getItem(STORAGE_KEY_PROJ) || '[]');
+        return { ok: true, data: localProjects, source: 'local' };
+      }
+
+      var fetchUrl = url + (url.indexOf('?') === -1 ? '?' : '&') + 'action=get_projects&_t=' + Date.now();
+      try {
+        var res = await fetch(fetchUrl, { method: 'GET', mode: 'cors' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var json = await res.json();
+        if (json.status === 'success' && Array.isArray(json.data) && json.data.length > 0) {
+          // Filter valid projects
+          var cleanRemote = json.data.filter(function (p) { return p.img && !p.img.startsWith('data:'); });
+          if (cleanRemote.length > 0) {
+            localStorage.setItem(STORAGE_KEY_PROJ, JSON.stringify(cleanRemote));
+            return { ok: true, data: cleanRemote, source: 'cloud' };
+          }
+        }
+        var currentLocal = JSON.parse(localStorage.getItem(STORAGE_KEY_PROJ) || '[]');
+        return { ok: true, data: currentLocal, source: 'local' };
+      } catch (err) {
+        var fallbackProj = JSON.parse(localStorage.getItem(STORAGE_KEY_PROJ) || '[]');
+        return { ok: false, data: fallbackProj, source: 'local' };
+      }
+    },
+
+    /**
+     * Delete project from Google Sheets & local cache
+     */
+    deleteProject: async function (id) {
+      try {
+        var list = JSON.parse(localStorage.getItem(STORAGE_KEY_PROJ) || '[]');
+        var filtered = list.filter(function (x) { return String(x.id) !== String(id); });
+        localStorage.setItem(STORAGE_KEY_PROJ, JSON.stringify(filtered));
+      } catch (e) {}
+
+      var url = this.getUrl();
+      if (!url) return;
+
+      try {
+        await fetch(url, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'delete_project', id: String(id) })
+        });
+      } catch (e) {}
     }
   };
 

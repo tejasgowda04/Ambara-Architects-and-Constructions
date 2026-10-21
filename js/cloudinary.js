@@ -45,34 +45,17 @@
     },
 
     /**
-     * Upload an image file
-     * If Cloudinary is configured in js/config.js, uploads to Cloudinary CDN.
-     * If not configured, gracefully falls back to canvas compression data URL.
+     * Upload an image file directly to Cloudinary CDN
+     * Returns optimized HTTPS CDN URL. Never saves raw base64 data to localStorage.
      */
     upload: async function (file, onProgress) {
       var cfg = this.getConfig();
 
-      // If Cloudinary is set up, upload to cloud!
-      if (cfg.cloudName && cfg.uploadPreset) {
-        try {
-          return await this.uploadToCloudinary(file, cfg.cloudName, cfg.uploadPreset, onProgress);
-        } catch (err) {
-          console.warn('Cloudinary upload failed, falling back to local compression:', err);
-          var fallbackDataUrl = await this.compressLocal(file);
-          return {
-            url: fallbackDataUrl,
-            source: 'local_compressed',
-            warning: 'Cloudinary upload failed: ' + err.message + '. Saved locally.'
-          };
-        }
+      if (!cfg.cloudName || !cfg.uploadPreset) {
+        throw new Error('Cloudinary credentials missing in js/config.js. Check CLOUDINARY_CLOUD_NAME and CLOUDINARY_UPLOAD_PRESET.');
       }
 
-      // Fallback: Local canvas compression
-      var compressed = await this.compressLocal(file);
-      return {
-        url: compressed,
-        source: 'local_compressed'
-      };
+      return await this.uploadToCloudinary(file, cfg.cloudName, cfg.uploadPreset, onProgress);
     },
 
     /**
@@ -80,7 +63,7 @@
      */
     uploadToCloudinary: function (file, cloudName, uploadPreset, onProgress) {
       return new Promise(function (resolve, reject) {
-        var url = 'https://api.cloudinary.com/v1_1/' + cloudName + '/image/upload';
+        var url = 'https://api.cloudinary.com/v1_1/' + encodeURIComponent(cloudName) + '/image/upload';
         var formData = new FormData();
         formData.append('file', file);
         formData.append('upload_preset', uploadPreset);
@@ -103,7 +86,11 @@
             try {
               var res = JSON.parse(xhr.responseText);
               var secureUrl = res.secure_url || res.url;
-              var optimizedUrl = secureUrl.replace('/upload/', '/upload/f_auto,q_auto,w_1600/');
+              // Auto-optimize images (WebP/AVIF format, auto quality, responsive 1600px max width)
+              var optimizedUrl = secureUrl;
+              if (secureUrl.includes('/upload/')) {
+                optimizedUrl = secureUrl.replace('/upload/', '/upload/f_auto,q_auto,w_1600/');
+              }
               resolve({
                 url: optimizedUrl,
                 publicId: res.public_id,
@@ -118,22 +105,29 @@
             var errMsg = 'Cloudinary upload failed (' + xhr.status + ')';
             try {
               var errObj = JSON.parse(xhr.responseText);
-              if (errObj.error && errObj.error.message) errMsg += ': ' + errObj.error.message;
+              if (errObj.error && errObj.error.message) {
+                errMsg = errObj.error.message;
+              }
             } catch (e) {}
             reject(new Error(errMsg));
           }
         };
 
         xhr.onerror = function () {
-          reject(new Error('Network error during Cloudinary upload'));
+          reject(new Error('Network error during Cloudinary upload. Please check your internet connection.'));
         };
+
+        xhr.ontimeout = function () {
+          reject(new Error('Image upload timed out. Please try again with a smaller file or faster connection.'));
+        };
+        xhr.timeout = 60000; // 60s timeout
 
         xhr.send(formData);
       });
     },
 
     /**
-     * Local browser compression fallback (max 1200px width/height, 74% JPEG quality)
+     * Local browser compression helper (utility only)
      */
     compressLocal: function (file) {
       return new Promise(function (resolve) {

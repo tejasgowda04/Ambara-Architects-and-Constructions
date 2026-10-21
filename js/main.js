@@ -169,10 +169,16 @@
     return defaultProjects;
   }
 
-  const galleryList = loadGalleryData();
-  const cv = $('#cv');
+  let isDragging = false;
+  let its = [];
+  let currentIdx = 0;
+  let carouselTimer;
+  let lbItems = [];
 
-  if (cv) {
+  function renderCarousel(galleryList) {
+    const cv = $('#cv');
+    if (!cv) return;
+
     cv.innerHTML = galleryList.map(p => `
       <div class="it" style="--c:${p[2]}">
         ${p[4] 
@@ -185,12 +191,26 @@
         </div>
       </div>
     `).join('');
-  }
 
-  let isDragging = false;
-  const its = $$('.it');
-  let currentIdx = 0;
-  let carouselTimer;
+    its = $$('.it');
+
+    const ls = $('#lbs');
+    if (ls && its.length) {
+      ls.innerHTML = '';
+      lbItems = its.map(el => {
+        const d = document.createElement('div');
+        d.className = 'lbit';
+        d.style.setProperty('--c', el.style.getPropertyValue('--c'));
+        d.innerHTML = el.querySelector('svg, img').outerHTML + el.querySelector('div').outerHTML;
+        ls.appendChild(d);
+        return d;
+      });
+    }
+
+    currentIdx = 0;
+    updateCarouselPositions();
+    resetCarouselTimer();
+  }
 
   function updateCarouselPositions() {
     its.forEach((el, i) => {
@@ -233,6 +253,7 @@
   if (btnNext) btnNext.onclick = () => { goToSlide(currentIdx + 1); resetCarouselTimer(); };
   if (btnPrev) btnPrev.onclick = () => { goToSlide(currentIdx - 1); resetCarouselTimer(); };
 
+  const cv = $('#cv');
   let startX = null;
   if (cv) {
     cv.onpointerdown = (e) => { startX = e.clientX; };
@@ -247,29 +268,28 @@
     });
   }
 
-  updateCarouselPositions();
-  resetCarouselTimer();
   window.addEventListener('resize', updateCarouselPositions);
 
-  /* -------------------------------------------------------------
-     8. Fullscreen Lightbox
-     ------------------------------------------------------------- */
-  const lb = $('#lb');
-  const ls = $('#lbs');
-  let lbIdx = 0;
-  let zoom = 1;
-  let tx = 0, ty = 0;
+  // Initial render from local cache or defaults
+  renderCarousel(loadGalleryData());
 
-  let lbItems = [];
-  if (ls && its.length) {
-    lbItems = its.map(el => {
-      const d = document.createElement('div');
-      d.className = 'lbit';
-      d.style.setProperty('--c', el.style.getPropertyValue('--c'));
-      d.innerHTML = el.querySelector('svg, img').outerHTML + el.querySelector('div').outerHTML;
-      ls.appendChild(d);
-      return d;
-    });
+  // Automatic cloud sync for projects from Google Sheets
+  if (window.AmbaraSheets && window.AmbaraSheets.fetchProjects) {
+    window.AmbaraSheets.fetchProjects().then(res => {
+      if (res && res.data && res.data.length > 0 && res.source === 'cloud') {
+        const stored = res.data.filter(x => x.on !== false && (x.img || x.url));
+        if (stored.length > 0) {
+          const freshList = stored.map(x => [
+            x.title || 'Project',
+            x.cat || 'Completed',
+            '#1a1f27',
+            0,
+            x.img || x.url
+          ]);
+          renderCarousel(freshList);
+        }
+      }
+    }).catch(() => {});
   }
 
   function clampPan() {

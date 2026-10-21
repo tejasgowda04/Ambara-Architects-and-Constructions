@@ -29,6 +29,20 @@
   };
   const CATEGORIES = ['Completed', 'Ongoing', 'Elevation', 'Interior'];
 
+  // Auto-clean any stale heavy base64 strings from previous failed uploads so storage is 0%
+  (function sanitizeLocalStorage() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_PROJ);
+      if (raw && raw.includes('data:image')) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const clean = parsed.filter(p => p.img && !p.img.startsWith('data:'));
+          localStorage.setItem(STORAGE_KEY_PROJ, JSON.stringify(clean));
+        }
+      }
+    } catch (e) {}
+  })();
+
   // Utilities
   const getStored = (k) => {
     try {
@@ -40,19 +54,22 @@
 
   const setStored = (k, v) => {
     try {
-      localStorage.setItem(k, JSON.stringify(v));
+      let dataToSave = v;
+      if (k === STORAGE_KEY_PROJ && Array.isArray(v)) {
+        // Guarantee no base64 images ever save to localStorage
+        dataToSave = v.filter(p => p.img && !p.img.startsWith('data:'));
+      }
+      localStorage.setItem(k, JSON.stringify(dataToSave));
       return true;
     } catch (e) {
       if (k === STORAGE_KEY_PROJ && Array.isArray(v)) {
         try {
-          // Clear any heavy base64 strings so Cloudinary CDN URLs always save cleanly
-          const onlyCdn = v.filter(p => p.img && !p.img.startsWith('data:'));
+          const onlyCdn = v.filter(p => p.img && p.img.startsWith('http'));
           localStorage.setItem(k, JSON.stringify(onlyCdn));
-          showToast('Cleaned old local cache. Cloudinary photos saved!');
           return true;
         } catch (e2) {}
       }
-      showToast('Storage full. Cloudinary photos will save cleanly.');
+      showToast('Storage full. Ensure photos are uploaded to Cloudinary CDN.');
       return false;
     }
   };
@@ -350,7 +367,7 @@
     };
   }
 
-  // Automatic Cloud Sync (Fetches latest enquiries from Google Sheets for any device)
+  // Automatic Cloud Sync (Fetches latest enquiries & projects from Google Sheets for any device)
   async function autoSyncFromCloud() {
     if (!window.AmbaraSheets || !window.AmbaraSheets.getUrl()) {
       checkSyncStatus();
@@ -359,13 +376,16 @@
 
     setSyncDot('syncing');
     try {
-      const res = await window.AmbaraSheets.fetchEnquiries();
-      if (res && res.ok && res.source === 'cloud') {
+      const p1 = window.AmbaraSheets.fetchEnquiries();
+      const p2 = window.AmbaraSheets.fetchProjects ? window.AmbaraSheets.fetchProjects() : Promise.resolve();
+      const [resEnq, resProj] = await Promise.all([p1, p2]);
+
+      if (resEnq && resEnq.ok && resEnq.source === 'cloud') {
         setSyncDot('online');
-        renderAllViews();
       } else {
         checkSyncStatus();
       }
+      renderAllViews();
     } catch (e) {
       checkSyncStatus();
     }
@@ -513,45 +533,56 @@
 
     const list = getStored(STORAGE_KEY_PROJ);
     let addedCount = 0;
+    const spinnerText = $('#spinner-text');
 
     if (progressBox) progressBox.hidden = false;
 
-    for (const f of files) {
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
       if (!f.type.startsWith('image/')) continue;
 
       const title = f.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
-      
+      if (spinnerText) spinnerText.textContent = `Uploading "${title}" to Cloudinary (${i + 1}/${files.length})…`;
+
       try {
-        let uploadResult;
-        if (window.AmbaraCloudinary) {
-          uploadResult = await window.AmbaraCloudinary.upload(f, (pct) => {
-            const spinnerText = $('#spinner-text');
-            if (spinnerText) spinnerText.textContent = `Uploading "${title}"… ${pct}%`;
-          });
+        if (!window.AmbaraCloudinary) {
+          throw new Error('Cloudinary script not loaded');
         }
 
+        const uploadResult = await window.AmbaraCloudinary.upload(f, (pct) => {
+          if (spinnerText) spinnerText.textContent = `Uploading "${title}"… ${pct}%`;
+        });
+
         const photoUrl = uploadResult?.url || '';
-        if (photoUrl) {
-          list.push({
-            id: Date.now() + Math.random(),
+        if (photoUrl && photoUrl.startsWith('http')) {
+          const newProj = {
+            id: String(Date.now() + Math.floor(Math.random() * 1000)),
             title: title,
             cat: 'Completed',
             img: photoUrl,
             on: true,
-            source: uploadResult?.source || 'local'
-          });
+            source: 'cloudinary'
+          };
+          list.push(newProj);
           addedCount++;
+
+          // Asynchronously sync new project to Google Sheets if connected
+          if (window.AmbaraSheets && window.AmbaraSheets.saveProject) {
+            window.AmbaraSheets.saveProject(newProj).catch(e => console.warn('Google Sheets sync error:', e));
+          }
         }
       } catch (err) {
         console.error('Error adding photo:', err);
+        showToast('Upload failed: ' + (err.message || 'Check connection'));
       }
     }
 
     if (progressBox) progressBox.hidden = true;
+    if (fi) fi.value = ''; // Reset input so re-selecting same file works
 
     if (addedCount > 0) {
       if (setStored(STORAGE_KEY_PROJ, list)) {
-        showToast(`${addedCount} photo(s) added successfully!`);
+        showToast(`${addedCount} photo(s) uploaded to Cloudinary CDN!`);
         renderProjects();
       }
     }
@@ -574,10 +605,9 @@
     const gr = $('#gr');
     const mu = $('#mu');
 
-    // Storage calculation
-    const rawStorageLength = (localStorage.getItem(STORAGE_KEY_PROJ) || '').length;
+    // Storage calculation (Cloudinary free tier is 25GB, local URL pointers use <1%)
     if (mu) {
-      mu.style.width = Math.min(100, (rawStorageLength / 4.5e6) * 100) + '%';
+      mu.style.width = Math.min(100, (list.length / 50) * 100) + '%';
     }
 
     if (!gr) return;
@@ -616,6 +646,9 @@
         const b = getStored(STORAGE_KEY_PROJ);
         b[+e.dataset.i][e.dataset.k] = e.value;
         setStored(STORAGE_KEY_PROJ, b);
+        if (window.AmbaraSheets && window.AmbaraSheets.saveProject) {
+          window.AmbaraSheets.saveProject(b[+e.dataset.i]);
+        }
       };
     });
 
@@ -628,9 +661,19 @@
 
         if (act === 'd') {
           if (!confirm('Delete this photo from the website gallery?')) return;
-          b.splice(idx, 1);
+          const removed = b.splice(idx, 1)[0];
+          setStored(STORAGE_KEY_PROJ, b);
+          renderProjects();
+          showToast('Photo deleted');
+          if (removed && window.AmbaraSheets && window.AmbaraSheets.deleteProject) {
+            window.AmbaraSheets.deleteProject(removed.id);
+          }
+          return;
         } else if (act === 't') {
           b[idx].on = !b[idx].on;
+          if (window.AmbaraSheets && window.AmbaraSheets.saveProject) {
+            window.AmbaraSheets.saveProject(b[idx]);
+          }
         } else {
           const targetIdx = act === 'l' ? idx - 1 : idx + 1;
           if (targetIdx < 0 || targetIdx >= b.length) return;

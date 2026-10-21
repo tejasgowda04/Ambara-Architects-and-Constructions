@@ -19,8 +19,9 @@
  */
 
 var SHEET_NAME = "Enquiries";
+var PROJECTS_SHEET = "Projects";
 
-// Headers for the spreadsheet table
+// Headers for the spreadsheet tables
 var HEADERS = [
   "ID",
   "Date & Time",
@@ -33,17 +34,24 @@ var HEADERS = [
   "Internal Notes"
 ];
 
+var PROJECT_HEADERS = [
+  "ID",
+  "Date Added",
+  "Project Title",
+  "Category",
+  "Cloudinary CDN URL",
+  "Active"
+];
+
 /**
- * Handle POST request — adds a new enquiry to the spreadsheet
+ * Handle POST request — adds/updates enquiry or project in the spreadsheet
  */
 function doPost(e) {
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(10000); // Wait up to 10s for lock
     
-    var sheet = getOrCreateSheet();
     var data = {};
-    
     if (e.postData && e.postData.contents) {
       try {
         data = JSON.parse(e.postData.contents);
@@ -53,6 +61,16 @@ function doPost(e) {
     } else {
       data = e.parameter || {};
     }
+
+    // Projects management actions
+    if (data.action === "save_project") {
+      return handleSaveProject(data);
+    }
+    if (data.action === "delete_project") {
+      return handleDeleteProject(data);
+    }
+
+    var sheet = getOrCreateSheet();
 
     // Support update action via POST
     if (data.action === "update") {
@@ -99,7 +117,7 @@ function doPost(e) {
 }
 
 /**
- * Handle GET request — fetch all enquiries or test ping
+ * Handle GET request — fetch all enquiries, projects, or test ping
  */
 function doGet(e) {
   try {
@@ -111,6 +129,30 @@ function doGet(e) {
         status: "ok",
         message: "Ambara Google Sheets API is connected and online!",
         timestamp: new Date().toISOString()
+      });
+    }
+
+    // Return all project photos
+    if (action === "get_projects") {
+      var projSheet = getOrCreateProjectsSheet();
+      var pRows = projSheet.getDataRange().getValues();
+      var projects = [];
+      for (var p = 1; p < pRows.length; p++) {
+        var prow = pRows[p];
+        if (!prow[0] || !prow[4]) continue;
+        projects.push({
+          id: String(prow[0]),
+          date: prow[1] || "",
+          title: String(prow[2] || "Project"),
+          cat: String(prow[3] || "Completed"),
+          img: String(prow[4] || ""),
+          on: prow[5] !== false && String(prow[5]).toLowerCase() !== "false"
+        });
+      }
+      return jsonResponse({
+        status: "success",
+        count: projects.length,
+        data: projects
       });
     }
 
@@ -225,6 +267,84 @@ function getOrCreateSheet() {
   }
   
   return sheet;
+}
+
+/**
+ * Helper to get or create the Projects sheet
+ */
+function getOrCreateProjectsSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(PROJECTS_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(PROJECTS_SHEET);
+  }
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(PROJECT_HEADERS);
+    var hRange = sheet.getRange(1, 1, 1, PROJECT_HEADERS.length);
+    hRange.setFontWeight("bold");
+    hRange.setBackground("#c9a24b");
+    hRange.setFontColor("#0b0e13");
+    hRange.setFontFamily("Outfit");
+    sheet.setFrozenRows(1);
+    sheet.setColumnWidth(1, 140); // ID
+    sheet.setColumnWidth(2, 170); // Date
+    sheet.setColumnWidth(3, 200); // Title
+    sheet.setColumnWidth(4, 130); // Category
+    sheet.setColumnWidth(5, 320); // URL
+    sheet.setColumnWidth(6, 90);  // Active
+  }
+  return sheet;
+}
+
+/**
+ * Handle saving/updating a project
+ */
+function handleSaveProject(data) {
+  var pSheet = getOrCreateProjectsSheet();
+  var rows = pSheet.getDataRange().getValues();
+  var targetId = String(data.id || Date.now());
+  var foundIndex = -1;
+
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === targetId) {
+      foundIndex = i + 1;
+      break;
+    }
+  }
+
+  var dateVal = data.date || new Date().toISOString();
+  var titleVal = data.title || "Project";
+  var catVal = data.cat || "Completed";
+  var imgVal = data.img || "";
+  var onVal = data.on !== undefined ? data.on : true;
+
+  if (foundIndex > -1) {
+    pSheet.getRange(foundIndex, 3).setValue(titleVal);
+    pSheet.getRange(foundIndex, 4).setValue(catVal);
+    if (imgVal) pSheet.getRange(foundIndex, 5).setValue(imgVal);
+    pSheet.getRange(foundIndex, 6).setValue(onVal);
+    return jsonResponse({ status: "success", message: "Project updated", id: targetId });
+  } else {
+    pSheet.appendRow([targetId, dateVal, titleVal, catVal, imgVal, onVal]);
+    return jsonResponse({ status: "success", message: "Project added", id: targetId });
+  }
+}
+
+/**
+ * Handle deleting a project
+ */
+function handleDeleteProject(data) {
+  var pSheet = getOrCreateProjectsSheet();
+  var rows = pSheet.getDataRange().getValues();
+  var targetId = String(data.id);
+
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === targetId) {
+      pSheet.deleteRow(i + 1);
+      return jsonResponse({ status: "success", message: "Project deleted", id: targetId });
+    }
+  }
+  return jsonResponse({ status: "error", message: "Project not found" });
 }
 
 /**

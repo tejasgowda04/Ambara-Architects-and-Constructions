@@ -385,6 +385,19 @@
       } else {
         checkSyncStatus();
       }
+
+      // Auto-push any local photos from this device to cloud if not synced yet (e.g. mobile upload)
+      if (resProj && resProj.ok && Array.isArray(resProj.data) && window.AmbaraSheets.saveProject) {
+        const cloudIds = new Set(resProj.data.map(p => String(p.id).replace(/^proj_/, '')));
+        const localList = getStored(STORAGE_KEY_PROJ);
+        for (const lp of localList) {
+          const cleanId = String(lp.id).replace(/^proj_/, '');
+          if (lp.img && lp.img.startsWith('http') && !cloudIds.has(cleanId)) {
+            window.AmbaraSheets.saveProject(lp);
+          }
+        }
+      }
+
       renderAllViews();
     } catch (e) {
       checkSyncStatus();

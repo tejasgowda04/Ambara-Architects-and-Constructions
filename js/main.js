@@ -276,7 +276,7 @@
   // Automatic cloud sync for projects from Google Sheets
   if (window.AmbaraSheets && window.AmbaraSheets.fetchProjects) {
     window.AmbaraSheets.fetchProjects().then(res => {
-      if (res && res.data && res.data.length > 0 && res.source === 'cloud') {
+      if (res && res.data && res.data.length > 0) {
         const stored = res.data.filter(x => x.on !== false && (x.img || x.url));
         if (stored.length > 0) {
           const freshList = stored.map(x => [

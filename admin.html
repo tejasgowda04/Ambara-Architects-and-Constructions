@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,300&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/admin.css">
+  <link rel="stylesheet" href="css/admin.css?v=3">
 </head>
 <body>
 
@@ -120,20 +120,11 @@
       <!-- View 2: Customer Enquiries -->
       <section id="v-enq" hidden>
         <div class="tb">
-          <div class="search-box">
-            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
-            <input id="q" placeholder="Search by name, phone, service, plot…">
-          </div>
-          <select id="fs"></select>
-          <button class="btn" id="btn-sync" title="Fetch latest enquiries from Google Sheets">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-            Sync Google Sheets
-          </button>
-          <button class="btn o" id="csv" title="Download enquiries spreadsheet">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          <select id="fs" aria-label="Filter enquiries by status"></select>
+          <button class="btn" id="csv" title="Download enquiries spreadsheet">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
             Export CSV
           </button>
-          <button class="btn o r" id="btn-clear-test" title="Remove sample/fake test enquiries">Clear Test Data</button>
         </div>
         <div id="el"></div>
       </section>
@@ -176,9 +167,9 @@
   </svg>
 
   <!-- Modular Scripts -->
-  <script src="js/config.js"></script>
-  <script src="js/sheets-api.js"></script>
-  <script src="js/cloudinary.js"></script>
-  <script src="js/admin.js"></script>
+  <script src="js/config.js?v=3"></script>
+  <script src="js/sheets-api.js?v=3"></script>
+  <script src="js/cloudinary.js?v=3"></script>
+  <script src="js/admin.js?v=3"></script>
 </body>
 </html>

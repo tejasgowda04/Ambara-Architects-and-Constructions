@@ -155,40 +155,48 @@ main { padding: 26px clamp(16px, 3vw, 40px); min-width: 0; }
 .wk span { font-size: .7rem; color: var(--mut); }
 .wk b { font-size: .75rem; font-weight: 400; }
 
-/* --- Toolbar --- */
+/* --- Toolbar (Only Status Filter & Export CSV) --- */
 .tb {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
-  flex-wrap: wrap;
-  margin-bottom: 18px;
-}
-.search-box {
-  position: relative;
-  flex: 1;
-  min-width: 220px;
-  display: flex;
-  align-items: center;
-}
-.search-box svg {
-  position: absolute;
-  left: 14px;
-  width: 17px;
-  height: 17px;
-  fill: none;
-  stroke: var(--mut);
-  stroke-width: 2;
-  pointer-events: none;
-}
-.search-box input {
-  padding-left: 42px;
-  background: var(--c1);
+  margin-bottom: 22px;
 }
 .tb select {
   width: auto;
-  min-width: 140px;
+  min-width: 170px;
+  height: 42px;
+  padding: 0 16px;
+  border-radius: 99px;
   background: var(--c1);
+  border: 1px solid var(--ln);
+  color: var(--iv);
   cursor: pointer;
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 0.25s ease;
+}
+.tb select:focus {
+  border-color: var(--g);
+}
+.tb .btn {
+  height: 42px;
+  padding: 0 22px;
+  border-radius: 99px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  background: var(--g);
+  color: var(--ink);
+  border: 1px solid var(--g);
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.25s ease;
+}
+.tb .btn:hover {
+  background: var(--iv);
+  border-color: var(--iv);
 }
 
 /* --- Enquiry Rows --- */

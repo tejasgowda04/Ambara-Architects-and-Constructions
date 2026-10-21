@@ -96,6 +96,7 @@
     }
     switchView('dash');
     checkSyncStatus();
+    autoSyncFromCloud();
   };
 
   const lf = $('#lf');
@@ -140,6 +141,10 @@
     if (ttl) ttl.textContent = titles[viewName] || 'Dashboard';
 
     renderAllViews();
+
+    if (viewName === 'enq' || viewName === 'dash') {
+      autoSyncFromCloud();
+    }
   }
 
   $$('nav button').forEach(b => {
@@ -292,22 +297,19 @@
   }
 
   function renderEnquiries() {
-    const q = ($('#q')?.value || '').toLowerCase();
     const filter = $('#fs')?.value || '';
     const list = getStored(STORAGE_KEY_ENQ).filter(x =>
-      (!filter || x.status === filter) &&
-      (!q || [x.name, x.phone, x.email, x.msg, x.service, x.notes].join(' ').toLowerCase().includes(q))
+      (!filter || x.status === filter)
     );
 
     const el = $('#el');
     if (el) {
       el.innerHTML = list.map(renderEnquiryRow).join('') ||
-        '<div class="empty">No enquiries match your search.<br>Check your filters or wait for website submissions.</div>';
+        '<div class="empty">No enquiries found for this filter.<br>Customer submissions from the website will automatically appear here.</div>';
       bindEnquiryClicks('#el');
     }
   }
 
-  if ($('#q')) $('#q').oninput = renderEnquiries;
   if ($('#fs')) $('#fs').onchange = renderEnquiries;
 
   // Export CSV
@@ -339,55 +341,25 @@
     };
   }
 
-  // Clear sample / test data
-  const btnClearTest = $('#btn-clear-test');
-  if (btnClearTest) {
-    btnClearTest.onclick = () => {
-      const list = getStored(STORAGE_KEY_ENQ);
-      if (!list.length) return showToast('No enquiries in database.');
+  // Automatic Cloud Sync (Fetches latest enquiries from Google Sheets for any device)
+  async function autoSyncFromCloud() {
+    if (!window.AmbaraSheets || !window.AmbaraSheets.getUrl()) {
+      checkSyncStatus();
+      return;
+    }
 
-      const samples = ['Ravi Kumar', 'Sneha R', 'Anil Gowda', 'Meena S'];
-      const hasSamples = list.some(x => samples.includes(x.name));
-
-      if (hasSamples) {
-        if (confirm('Remove all sample test enquiries (Ravi Kumar, Sneha R, etc.)? Real website enquiries will be kept.')) {
-          const filtered = list.filter(x => !samples.includes(x.name));
-          setStored(STORAGE_KEY_ENQ, filtered);
-          showToast(`Removed ${list.length - filtered.length} sample entries.`);
-          renderAllViews();
-        }
+    setSyncDot('syncing');
+    try {
+      const res = await window.AmbaraSheets.fetchEnquiries();
+      if (res && res.ok && res.source === 'cloud') {
+        setSyncDot('online');
+        renderAllViews();
       } else {
-        if (confirm('Do you want to clear all ' + list.length + ' stored enquiries from the dashboard?')) {
-          setStored(STORAGE_KEY_ENQ, []);
-          showToast('All enquiries cleared.');
-          renderAllViews();
-        }
+        checkSyncStatus();
       }
-    };
-  }
-
-  // Sync with Google Sheets button
-  const btnSync = $('#btn-sync');
-  if (btnSync) {
-    btnSync.onclick = async () => {
-      btnSync.disabled = true;
-      btnSync.textContent = 'Syncing…';
-      setSyncDot('syncing');
-
-      if (window.AmbaraSheets) {
-        const res = await window.AmbaraSheets.fetchEnquiries();
-        if (res.ok) {
-          showToast(`Synced ${res.data.length} enquiries from Google Sheets!`);
-          setSyncDot('online');
-        } else {
-          showToast(`Sync notice: ${res.error || 'Using local database'}`);
-          setSyncDot('offline');
-        }
-      }
-      btnSync.disabled = false;
-      btnSync.textContent = 'Sync Google Sheets';
-      renderAllViews();
-    };
+    } catch (e) {
+      checkSyncStatus();
+    }
   }
 
   function setSyncDot(state) {

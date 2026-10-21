@@ -10,7 +10,47 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,300&family=Outfit:wght@300;400;500&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=3">
+  <link rel="stylesheet" href="css/style.css?v=7">
+  <style>
+    /* Critical modal styles immune to external CSS caching */
+    .enq-modal-backdrop {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      z-index: 999999 !important;
+      background: rgba(6, 8, 12, 0.88) !important;
+      -webkit-backdrop-filter: blur(12px) !important;
+      backdrop-filter: blur(12px) !important;
+      display: none;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 20px !important;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+    .enq-modal-backdrop.active {
+      display: flex !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+    }
+    .enq-modal-card {
+      width: min(480px, 100%) !important;
+      background: #11151c !important;
+      background: linear-gradient(160deg, #181d26, #0e1218) !important;
+      border: 1px solid rgba(201, 162, 75, 0.5) !important;
+      border-radius: 24px !important;
+      padding: 36px 26px !important;
+      text-align: center !important;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.8), 0 0 40px rgba(201, 162, 75, 0.2) !important;
+      position: relative !important;
+      z-index: 1000000 !important;
+    }
+  </style>
 </head>
 
 <body>
@@ -455,9 +495,9 @@
     </div>
   </div>
 
-  <script src="js/config.js?v=6"></script>
-  <script src="js/sheets-api.js?v=6"></script>
-  <script src="js/main.js?v=6"></script>
+  <script src="js/config.js?v=7"></script>
+  <script src="js/sheets-api.js?v=7"></script>
+  <script src="js/main.js?v=7"></script>
 </body>
 
 </html>

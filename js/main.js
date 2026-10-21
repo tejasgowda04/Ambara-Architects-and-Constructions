@@ -448,7 +448,10 @@
   const modalClose = $('#modal-close-btn');
 
   const closeModal = () => {
-    if (enqModal) enqModal.classList.remove('active');
+    if (enqModal) {
+      enqModal.classList.remove('active');
+      setTimeout(() => { enqModal.style.display = 'none'; }, 300);
+    }
   };
 
   if (modalClose) modalClose.onclick = closeModal;
@@ -459,7 +462,7 @@
   }
 
   if (fm) {
-    fm.onsubmit = async (e) => {
+    fm.onsubmit = function (e) {
       e.preventDefault();
 
       const name = ($('#fn')?.value || '').trim();
@@ -469,7 +472,7 @@
       const msg = ($('#ms')?.value || '').trim();
 
       if (!name || !phone) {
-        alert('Please provide your name and phone number so we can get in touch.');
+        alert('Please enter your name and phone number so we can get in touch.');
         return;
       }
 
@@ -485,49 +488,43 @@
         notes: ''
       };
 
-      // 1. Loading state
-      if (btnSub) {
-        btnSub.disabled = true;
-        btnSub.textContent = 'Submitting enquiry…';
+      // 1. Immediately store in local database (instant 0ms)
+      try {
+        const list = JSON.parse(localStorage.getItem('wsite_enq') || '[]');
+        list.unshift(enquiryData);
+        localStorage.setItem('wsite_enq', JSON.stringify(list));
+      } catch (err) {}
+
+      // 2. Immediately reset the form inputs
+      fm.reset();
+
+      // 3. Immediately show confirmation popup modal
+      if (modalDesc) {
+        modalDesc.innerHTML = `Thank you, <strong>${escapeHtml(name)}</strong>! Your enquiry for <strong>${escapeHtml(service)}</strong> has been received directly by our team. We will call you at <strong>${escapeHtml(phone)}</strong> shortly.`;
       }
+      if (enqModal) {
+        enqModal.style.display = 'flex';
+        enqModal.classList.add('active');
+      }
+
+      // 4. Also show green success text right under the button
       if (ok) {
         ok.style.display = 'block';
-        ok.textContent = 'Sending enquiry to Ambara Architects…';
+        ok.style.color = '#4ade80';
+        ok.innerHTML = `✔ <strong>Enquiry Submitted!</strong> Thank you ${escapeHtml(name)}, we will call you shortly.`;
       }
 
-      try {
-        // 2. Dispatch save to Google Sheets & local cache
-        if (window.AmbaraSheets && window.AmbaraSheets.saveEnquiry) {
-          await window.AmbaraSheets.saveEnquiry(enquiryData);
-        } else {
-          const list = JSON.parse(localStorage.getItem('wsite_enq') || '[]');
-          list.unshift(enquiryData);
-          localStorage.setItem('wsite_enq', JSON.stringify(list));
-        }
+      // 5. Restore submit button state
+      if (btnSub) {
+        btnSub.disabled = false;
+        btnSub.textContent = 'Submit Enquiry';
+      }
 
-        // 3. Reset form
-        fm.reset();
-
-        // 4. Show confirmation popup message
-        if (modalDesc) {
-          modalDesc.innerHTML = `Thank you, <strong>${escapeHtml(name)}</strong>! Your enquiry for <strong>${escapeHtml(service)}</strong> has been received directly by our team. We will call you at <strong>${escapeHtml(phone)}</strong> shortly.`;
-        }
-        if (enqModal) {
-          enqModal.classList.add('active');
-        }
-      } catch (err) {
-        console.warn('Enquiry save notice:', err);
-        // Fallback popup even if network is offline
-        if (enqModal) {
-          enqModal.classList.add('active');
-        }
-      } finally {
-        // 5. Always restore submit button state
-        if (btnSub) {
-          btnSub.disabled = false;
-          btnSub.textContent = 'Submit Enquiry';
-        }
-        if (ok) ok.style.display = 'none';
+      // 6. Asynchronously dispatch to Google Sheets in background (Non-blocking!)
+      if (window.AmbaraSheets && window.AmbaraSheets.saveEnquiry) {
+        window.AmbaraSheets.saveEnquiry(enquiryData).catch(function (err) {
+          console.warn('Background sync:', err);
+        });
       }
     };
   }

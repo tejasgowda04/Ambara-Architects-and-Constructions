@@ -409,10 +409,25 @@
   }
 
   /* -------------------------------------------------------------
-     10. Contact Form Submission (Google Sheets + WhatsApp)
+     10. Contact Form Submission (Direct to Dashboard & Google Sheets)
      ------------------------------------------------------------- */
   const fm = $('#fm');
   const ok = $('#ok');
+  const btnSub = $('#btn-submit-enquiry');
+  const enqModal = $('#enq-modal');
+  const modalDesc = $('#modal-desc');
+  const modalClose = $('#modal-close-btn');
+
+  const closeModal = () => {
+    if (enqModal) enqModal.classList.remove('active');
+  };
+
+  if (modalClose) modalClose.onclick = closeModal;
+  if (enqModal) {
+    enqModal.onclick = (e) => {
+      if (e.target === enqModal) closeModal();
+    };
+  }
 
   if (fm) {
     fm.onsubmit = async (e) => {
@@ -423,6 +438,11 @@
       const email = ($('#em')?.value || '').trim();
       const service = ($('#sv')?.value || 'Residential construction').trim();
       const msg = ($('#ms')?.value || '').trim();
+
+      if (!name || !phone) {
+        alert('Please provide your name and phone number so we can get in touch.');
+        return;
+      }
 
       const enquiryData = {
         id: Date.now().toString(),
@@ -436,18 +456,21 @@
         notes: ''
       };
 
-      // 1. Show feedback
+      // 1. Loading state
+      if (btnSub) {
+        btnSub.disabled = true;
+        btnSub.textContent = 'Submitting enquiry…';
+      }
       if (ok) {
         ok.style.display = 'block';
-        ok.textContent = 'Saving enquiry & opening WhatsApp…';
+        ok.textContent = 'Sending enquiry to Ambara Architects…';
       }
 
-      // 2. Save to Google Sheets (and local storage via AmbaraSheets)
+      // 2. Save directly to Google Sheets & local database
       try {
         if (window.AmbaraSheets) {
           await window.AmbaraSheets.saveEnquiry(enquiryData);
         } else {
-          // Direct fallback to localStorage
           const list = JSON.parse(localStorage.getItem('wsite_enq') || '[]');
           list.unshift(enquiryData);
           localStorage.setItem('wsite_enq', JSON.stringify(list));
@@ -456,19 +479,21 @@
         console.warn('Enquiry save notice:', err);
       }
 
-      // 3. Format message & launch WhatsApp
-      const cleanPhone = phone.replace(/\D/g, '');
-      const waText = encodeURIComponent(
-        `Hi Ambara Architects,\nI'm *${name}*.\nPhone: ${phone}\nEmail: ${email || '-'}\nNeed: ${service}\nDetails: ${msg || '-'}`
-      );
+      // 3. Reset button & form
+      if (btnSub) {
+        btnSub.disabled = false;
+        btnSub.textContent = 'Submit Enquiry';
+      }
+      if (ok) ok.style.display = 'none';
+      fm.reset();
 
-      setTimeout(() => {
-        window.open(`https://wa.me/919845501254?text=${waText}`, '_blank');
-        if (ok) {
-          ok.textContent = 'Enquiry sent successfully! We will contact you shortly.';
-        }
-        fm.reset();
-      }, 300);
+      // 4. Show confirmation popup message
+      if (modalDesc) {
+        modalDesc.innerHTML = `Thank you, <strong>${escapeHtml(name)}</strong>! Your enquiry for <strong>${escapeHtml(service)}</strong> has been received directly by our team. We will call you at <strong>${escapeHtml(phone)}</strong> shortly.`;
+      }
+      if (enqModal) {
+        enqModal.classList.add('active');
+      }
     };
   }
 

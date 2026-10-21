@@ -256,18 +256,33 @@
   const renderEnquiryRow = (x) => `
     <div class="row" data-id="${x.id}">
       <div class="av">${escapeHtml((x.name || '?')[0].toUpperCase())}</div>
-      <div>
+      <div class="ri">
         <b>${escapeHtml(x.name)}</b>
         <small>${escapeHtml(x.service || 'Enquiry')} · ${escapeHtml(x.phone || x.msg)}</small>
       </div>
       ${renderStatusPill(x.status)}
       <span class="t">${timeAgo(x.date)}</span>
+      <button class="row-del-btn" title="Delete enquiry" data-del="${x.id}">✕</button>
     </div>
   `;
 
   const bindEnquiryClicks = (containerSelector) => {
     $$(containerSelector + ' .row').forEach(row => {
-      row.onclick = () => openEnquiryDrawer(row.dataset.id);
+      row.onclick = (e) => {
+        const delBtn = e.target.closest('.row-del-btn');
+        if (delBtn) {
+          e.stopPropagation();
+          const delId = delBtn.dataset.del;
+          if (confirm('Delete this enquiry?')) {
+            const updated = getStored(STORAGE_KEY_ENQ).filter(y => String(y.id) !== String(delId));
+            setStored(STORAGE_KEY_ENQ, updated);
+            renderAllViews();
+            showToast('Enquiry deleted');
+          }
+          return;
+        }
+        openEnquiryDrawer(row.dataset.id);
+      };
     });
   };
 
@@ -324,43 +339,30 @@
     };
   }
 
-  // Add sample demo data
-  const btnDemo = $('#demo');
-  if (btnDemo) {
-    btnDemo.onclick = async () => {
-      const now = Date.now();
-      const samples = [
-        ['Ravi Kumar', '9880012345', 'ravi@mail.com', 'Residential construction', '30x40 plot in Kengeri, budget 65 lakhs', 0, 'New'],
-        ['Sneha R', '9740098765', 'sneha.r@gmail.com', 'Interior design', '3BHK full interior makeover with modular kitchen', 4, 'Contacted'],
-        ['Anil Gowda', '9900011223', '', 'Elevation design', 'G+2 modern elevation design for corner site', 24, 'Quotation'],
-        ['Meena S', '9845512340', 'meena@clinic.com', 'Commercial construction', 'Small dental clinic build, 1200 sq.ft', 48, 'Won']
-      ];
-
+  // Clear sample / test data
+  const btnClearTest = $('#btn-clear-test');
+  if (btnClearTest) {
+    btnClearTest.onclick = () => {
       const list = getStored(STORAGE_KEY_ENQ);
-      for (let i = 0; i < samples.length; i++) {
-        const s = samples[i];
-        const enq = {
-          id: (now + i).toString(),
-          name: s[0],
-          phone: s[1],
-          email: s[2],
-          service: s[3],
-          msg: s[4],
-          date: new Date(now - s[5] * 3600000).toISOString(),
-          status: s[6],
-          notes: ''
-        };
-        list.push(enq);
-        // Also sync sample to Google Sheets if configured
-        if (window.AmbaraSheets && window.AmbaraSheets.getUrl()) {
-          window.AmbaraSheets.saveEnquiry(enq);
+      if (!list.length) return showToast('No enquiries in database.');
+
+      const samples = ['Ravi Kumar', 'Sneha R', 'Anil Gowda', 'Meena S'];
+      const hasSamples = list.some(x => samples.includes(x.name));
+
+      if (hasSamples) {
+        if (confirm('Remove all sample test enquiries (Ravi Kumar, Sneha R, etc.)? Real website enquiries will be kept.')) {
+          const filtered = list.filter(x => !samples.includes(x.name));
+          setStored(STORAGE_KEY_ENQ, filtered);
+          showToast(`Removed ${list.length - filtered.length} sample entries.`);
+          renderAllViews();
+        }
+      } else {
+        if (confirm('Do you want to clear all ' + list.length + ' stored enquiries from the dashboard?')) {
+          setStored(STORAGE_KEY_ENQ, []);
+          showToast('All enquiries cleared.');
+          renderAllViews();
         }
       }
-
-      list.sort((a, b) => new Date(b.date) - new Date(a.date));
-      setStored(STORAGE_KEY_ENQ, list);
-      showToast('Sample enquiries added!');
-      renderAllViews();
     };
   }
 

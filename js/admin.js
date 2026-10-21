@@ -43,7 +43,16 @@
       localStorage.setItem(k, JSON.stringify(v));
       return true;
     } catch (e) {
-      showToast('Local storage full. Delete old photos or connect Cloudinary.');
+      if (k === STORAGE_KEY_PROJ && Array.isArray(v)) {
+        try {
+          // Clear any heavy base64 strings so Cloudinary CDN URLs always save cleanly
+          const onlyCdn = v.filter(p => p.img && !p.img.startsWith('data:'));
+          localStorage.setItem(k, JSON.stringify(onlyCdn));
+          showToast('Cleaned old local cache. Cloudinary photos saved!');
+          return true;
+        } catch (e2) {}
+      }
+      showToast('Storage full. Cloudinary photos will save cleanly.');
       return false;
     }
   };

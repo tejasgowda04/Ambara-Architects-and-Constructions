@@ -19,5 +19,5 @@ window.AMBARA_CONFIG = {
    * Free 25GB cloud hosting from cloudinary.com:
    */
   CLOUDINARY_CLOUD_NAME: "ambara-builds",      // <-- Paste your Cloud Name here (e.g. "ambara-builds")
-  CLOUDINARY_UPLOAD_PRESET: "ambara_projects"    // <-- Paste your Unsigned Upload Preset name here (e.g. "ambara_uploads")
+  CLOUDINARY_UPLOAD_PRESET: "ambara_uploads"    // <-- Active unsigned upload preset on Cloudinary
 };

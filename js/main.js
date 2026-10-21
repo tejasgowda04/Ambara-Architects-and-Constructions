@@ -12,6 +12,15 @@
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => [...document.querySelectorAll(s)];
 
+  const escapeHtml = (str) =>
+    String(str ?? '').replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[c]));
+
   /* -------------------------------------------------------------
      1. Preloader Intro Animation
      ------------------------------------------------------------- */
@@ -486,33 +495,39 @@
         ok.textContent = 'Sending enquiry to Ambara Architects…';
       }
 
-      // 2. Save directly to Google Sheets & local database
       try {
-        if (window.AmbaraSheets) {
+        // 2. Dispatch save to Google Sheets & local cache
+        if (window.AmbaraSheets && window.AmbaraSheets.saveEnquiry) {
           await window.AmbaraSheets.saveEnquiry(enquiryData);
         } else {
           const list = JSON.parse(localStorage.getItem('wsite_enq') || '[]');
           list.unshift(enquiryData);
           localStorage.setItem('wsite_enq', JSON.stringify(list));
         }
+
+        // 3. Reset form
+        fm.reset();
+
+        // 4. Show confirmation popup message
+        if (modalDesc) {
+          modalDesc.innerHTML = `Thank you, <strong>${escapeHtml(name)}</strong>! Your enquiry for <strong>${escapeHtml(service)}</strong> has been received directly by our team. We will call you at <strong>${escapeHtml(phone)}</strong> shortly.`;
+        }
+        if (enqModal) {
+          enqModal.classList.add('active');
+        }
       } catch (err) {
         console.warn('Enquiry save notice:', err);
-      }
-
-      // 3. Reset button & form
-      if (btnSub) {
-        btnSub.disabled = false;
-        btnSub.textContent = 'Submit Enquiry';
-      }
-      if (ok) ok.style.display = 'none';
-      fm.reset();
-
-      // 4. Show confirmation popup message
-      if (modalDesc) {
-        modalDesc.innerHTML = `Thank you, <strong>${escapeHtml(name)}</strong>! Your enquiry for <strong>${escapeHtml(service)}</strong> has been received directly by our team. We will call you at <strong>${escapeHtml(phone)}</strong> shortly.`;
-      }
-      if (enqModal) {
-        enqModal.classList.add('active');
+        // Fallback popup even if network is offline
+        if (enqModal) {
+          enqModal.classList.add('active');
+        }
+      } finally {
+        // 5. Always restore submit button state
+        if (btnSub) {
+          btnSub.disabled = false;
+          btnSub.textContent = 'Submit Enquiry';
+        }
+        if (ok) ok.style.display = 'none';
       }
     };
   }

@@ -76,12 +76,17 @@
 
       try {
         var payload = JSON.stringify(enquiry);
+        var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        var timeoutId = controller ? setTimeout(function () { controller.abort(); }, 6000) : null;
+
         await fetch(url, {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: payload
+          body: payload,
+          signal: controller ? controller.signal : undefined
         });
+        if (timeoutId) clearTimeout(timeoutId);
 
         return { ok: true, source: 'cloud', message: 'Saved to Google Sheets & locally.' };
       } catch (err) {

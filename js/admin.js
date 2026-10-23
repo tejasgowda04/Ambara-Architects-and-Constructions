@@ -571,7 +571,8 @@
           const newProj = {
             id: String(Date.now() + Math.floor(Math.random() * 1000)),
             title: title,
-            cat: 'Completed',
+            location: '',
+            cat: '',
             img: photoUrl,
             on: true,
             source: 'cloudinary'
@@ -635,42 +636,117 @@
       return;
     }
 
-    gr.innerHTML = list.map((p, i) => `
-      <div class="pc ${p.on ? '' : 'off'}">
+    gr.innerHTML = list.map((p, i) => {
+      const locVal = p.location !== undefined ? p.location : (CATEGORIES.includes(p.cat) ? '' : (p.cat || ''));
+      return `
+      <div class="pc ${p.on ? '' : 'off'}" data-card-idx="${i}">
         <img src="${p.img}" alt="${escapeHtml(p.title)}" loading="lazy">
         <div>
-          <input data-i="${i}" data-k="title" value="${escapeHtml(p.title)}" placeholder="Project title">
-          <select data-i="${i}" data-k="cat">
-            ${CATEGORIES.map(c => `<option ${p.cat === c ? 'selected' : ''}>${c}</option>`).join('')}
-          </select>
+          <div class="field-wrap">
+            <label class="field-lbl">Image Name</label>
+            <input data-i="${i}" data-k="title" value="${escapeHtml(p.title || '')}" placeholder="Image name / Project title">
+          </div>
+          <div class="field-wrap">
+            <label class="field-lbl">Location</label>
+            <input data-i="${i}" data-k="location" value="${escapeHtml(locVal)}" placeholder="Project location (e.g. Kengeri, Bengaluru)">
+          </div>
+          <button class="btn sm btn-save-proj" data-a="s" data-i="${i}" type="button">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="flex:none"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+            <span>Save</span>
+          </button>
           <div class="ac">
-            <button data-a="l" data-i="${i}" title="Move Left">←</button>
-            <button data-a="t" data-i="${i}">${p.on ? 'Hide' : 'Show'}</button>
-            <button data-a="r" data-i="${i}" title="Move Right">→</button>
-            <button data-a="d" data-i="${i}" title="Delete" style="color:#ff8a8a">🗑</button>
+            <button data-a="l" data-i="${i}" title="Move Left" type="button">←</button>
+            <button data-a="t" data-i="${i}" type="button">${p.on ? 'Hide' : 'Show'}</button>
+            <button data-a="r" data-i="${i}" title="Move Right" type="button">→</button>
+            <button data-a="d" data-i="${i}" title="Delete" style="color:#ff8a8a" type="button">🗑</button>
           </div>
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
-    // Input changes (title & category)
-    $$('#gr [data-k]').forEach(e => {
-      e.onchange = () => {
+    function saveProjectItem(idx, btnEl) {
+      const b = getStored(STORAGE_KEY_PROJ);
+      if (!b[idx]) return;
+
+      const titleInput = $(`#gr input[data-i="${idx}"][data-k="title"]`);
+      const locInput = $(`#gr input[data-i="${idx}"][data-k="location"]`);
+
+      if (titleInput) b[idx].title = titleInput.value.trim();
+      if (locInput) {
+        b[idx].location = locInput.value.trim();
+        b[idx].cat = b[idx].location;
+      }
+
+      setStored(STORAGE_KEY_PROJ, b);
+      if (window.AmbaraSheets && window.AmbaraSheets.saveProject) {
+        window.AmbaraSheets.saveProject(b[idx]).catch(e => console.warn('Google Sheets sync error:', e));
+      }
+
+      showToast('Project details saved!');
+
+      if (btnEl) {
+        const origContent = btnEl.innerHTML;
+        btnEl.innerHTML = '<span>✓ Saved</span>';
+        btnEl.style.background = '#4ade80';
+        btnEl.style.borderColor = '#4ade80';
+        btnEl.style.color = '#0b0e13';
+        setTimeout(() => {
+          btnEl.innerHTML = origContent;
+          btnEl.style.background = '';
+          btnEl.style.borderColor = '';
+          btnEl.style.color = '';
+        }, 1500);
+      }
+    }
+
+    // Input changes (title & location) and Enter key to save
+    $$('#gr input[data-k]').forEach(input => {
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const idx = +input.dataset.i;
+          const btn = $(`#gr button[data-a="s"][data-i="${idx}"]`);
+          saveProjectItem(idx, btn);
+        }
+      };
+
+      input.onchange = () => {
+        const idx = +input.dataset.i;
         const b = getStored(STORAGE_KEY_PROJ);
-        b[+e.dataset.i][e.dataset.k] = e.value;
-        setStored(STORAGE_KEY_PROJ, b);
-        if (window.AmbaraSheets && window.AmbaraSheets.saveProject) {
-          window.AmbaraSheets.saveProject(b[+e.dataset.i]);
+        if (b[idx]) {
+          b[idx][input.dataset.k] = input.value.trim();
+          if (input.dataset.k === 'location') {
+            b[idx].cat = b[idx].location;
+          }
+          setStored(STORAGE_KEY_PROJ, b);
+          if (window.AmbaraSheets && window.AmbaraSheets.saveProject) {
+            window.AmbaraSheets.saveProject(b[idx]).catch(e => console.warn('Google Sheets sync error:', e));
+          }
         }
       };
     });
 
-    // Action buttons (move left/right, toggle on/off, delete)
+    // Action buttons (save, move left/right, toggle on/off, delete)
     $$('#gr [data-a]').forEach(btn => {
       btn.onclick = () => {
         const b = getStored(STORAGE_KEY_PROJ);
         const idx = +btn.dataset.i;
         const act = btn.dataset.a;
+
+        if (act === 's') {
+          saveProjectItem(idx, btn);
+          return;
+        }
+
+        // Keep current unsaved typing before moving or toggling
+        const curTitle = $(`#gr input[data-i="${idx}"][data-k="title"]`);
+        const curLoc = $(`#gr input[data-i="${idx}"][data-k="location"]`);
+        if (curTitle && b[idx]) b[idx].title = curTitle.value.trim();
+        if (curLoc && b[idx]) {
+          b[idx].location = curLoc.value.trim();
+          b[idx].cat = b[idx].location;
+        }
 
         if (act === 'd') {
           if (!confirm('Delete this photo from the website gallery?')) return;
@@ -690,6 +766,13 @@
         } else {
           const targetIdx = act === 'l' ? idx - 1 : idx + 1;
           if (targetIdx < 0 || targetIdx >= b.length) return;
+          const targetTitle = $(`#gr input[data-i="${targetIdx}"][data-k="title"]`);
+          const targetLoc = $(`#gr input[data-i="${targetIdx}"][data-k="location"]`);
+          if (targetTitle && b[targetIdx]) b[targetIdx].title = targetTitle.value.trim();
+          if (targetLoc && b[targetIdx]) {
+            b[targetIdx].location = targetLoc.value.trim();
+            b[targetIdx].cat = b[targetIdx].location;
+          }
           [b[idx], b[targetIdx]] = [b[targetIdx], b[idx]];
         }
 

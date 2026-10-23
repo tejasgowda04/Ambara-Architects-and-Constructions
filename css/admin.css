@@ -315,18 +315,47 @@ main { padding: 26px clamp(16px, 3vw, 40px); min-width: 0; }
 .dz b { color: var(--g2); font-weight: 400; }
 
 /* --- Photo Grid --- */
-.gr { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.gr { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
 .pc {
   border: 1px solid var(--ln); border-radius: 16px; overflow: hidden;
-  background: var(--c1);
+  background: var(--c1); transition: border-color .25s ease;
 }
+.pc:hover { border-color: rgba(201, 162, 75, 0.4); }
 .pc img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
 .pc.off img { opacity: .35; filter: grayscale(1); }
-.pc div { padding: 10px; display: grid; gap: 7px; }
-.pc .ac { display: flex; gap: 6px; }
+.pc div { padding: 12px; display: grid; gap: 8px; }
+.pc .field-wrap { display: flex; flex-direction: column; gap: 3px; }
+.pc .field-lbl {
+  font-size: 0.68rem;
+  color: var(--mut);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+  display: block;
+}
+.pc input {
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  border-radius: 8px;
+  background: #ffffff0a;
+}
+.pc input:focus {
+  background: #ffffff12;
+}
+.btn-save-proj {
+  width: 100%;
+  justify-content: center;
+  font-weight: 500;
+  font-size: 0.82rem;
+  padding: 8px 12px;
+  margin-top: 2px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+.pc .ac { display: flex; gap: 6px; margin-top: 2px; }
 .pc .ac button {
   flex: 1; padding: 6px; border-radius: 9px; border: 1px solid var(--ln);
-  background: none; cursor: pointer; transition: .3s;
+  background: none; cursor: pointer; transition: .3s; font-size: 0.78rem;
 }
 .pc .ac button:hover { border-color: var(--g); color: var(--g2); }
 

@@ -38,7 +38,7 @@ var PROJECT_HEADERS = [
   "ID",
   "Date Added",
   "Project Title",
-  "Category",
+  "Location",
   "Cloudinary CDN URL",
   "Active"
 ];
@@ -140,11 +140,13 @@ function doGet(e) {
       for (var p = 1; p < pRows.length; p++) {
         var prow = pRows[p];
         if (!prow[0] || !prow[4]) continue;
+        var loc = String(prow[3] || "");
         projects.push({
           id: String(prow[0]),
           date: prow[1] || "",
           title: String(prow[2] || "Project"),
-          cat: String(prow[3] || "Completed"),
+          location: loc,
+          cat: loc,
           img: String(prow[4] || ""),
           on: prow[5] !== false && String(prow[5]).toLowerCase() !== "false"
         });
@@ -314,18 +316,18 @@ function handleSaveProject(data) {
 
   var dateVal = data.date || new Date().toISOString();
   var titleVal = data.title || "Project";
-  var catVal = data.cat || "Completed";
+  var locVal = data.location || data.cat || "";
   var imgVal = data.img || "";
   var onVal = data.on !== undefined ? data.on : true;
 
   if (foundIndex > -1) {
     pSheet.getRange(foundIndex, 3).setValue(titleVal);
-    pSheet.getRange(foundIndex, 4).setValue(catVal);
+    pSheet.getRange(foundIndex, 4).setValue(locVal);
     if (imgVal) pSheet.getRange(foundIndex, 5).setValue(imgVal);
     pSheet.getRange(foundIndex, 6).setValue(onVal);
     return jsonResponse({ status: "success", message: "Project updated", id: targetId });
   } else {
-    pSheet.appendRow([targetId, dateVal, titleVal, catVal, imgVal, onVal]);
+    pSheet.appendRow([targetId, dateVal, titleVal, locVal, imgVal, onVal]);
     return jsonResponse({ status: "success", message: "Project added", id: targetId });
   }
 }

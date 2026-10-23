@@ -183,7 +183,8 @@
      */
     saveProject: async function (project) {
       if (!project.id) project.id = Date.now().toString();
-      if (!project.cat) project.cat = 'Completed';
+      if (!project.location) project.location = project.cat || '';
+      if (!project.cat) project.cat = project.location || '';
       if (project.on === undefined) project.on = true;
 
       var cleanId = String(project.id).replace(/^proj_/, '');
@@ -195,7 +196,8 @@
         var normalized = {
           id: cleanId,
           title: project.title || 'Project',
-          cat: project.cat || 'Completed',
+          location: project.location || '',
+          cat: project.location || project.cat || '',
           img: project.img || '',
           on: project.on !== false,
           source: 'cloudinary'
@@ -218,12 +220,12 @@
           id: 'proj_' + cleanId,
           date: project.date || new Date().toISOString(),
           name: project.title || 'Project',
-          phone: project.cat || 'Completed',
-          email: '',
+          phone: project.location || project.cat || '',
+          email: project.location || '',
           service: '__PROJECT__',
           msg: project.img, // Cloudinary CDN URL
           status: project.on !== false ? 'Active' : 'Inactive',
-          notes: ''
+          notes: project.location || ''
         };
 
         await fetch(url, {
@@ -261,11 +263,13 @@
               return x && x.service === '__PROJECT__' && x.status !== 'Deleted';
             })
             .map(function (x) {
+              var loc = x.phone || x.notes || x.email || '';
               return {
                 id: String(x.id).replace(/^proj_/, ''),
                 date: x.date || '',
                 title: x.name || 'Project',
-                cat: x.phone || 'Completed',
+                location: loc,
+                cat: loc,
                 img: x.msg || '',
                 on: x.status === 'Active',
                 source: 'cloudinary'

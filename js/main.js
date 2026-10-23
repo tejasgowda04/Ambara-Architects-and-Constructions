@@ -169,7 +169,7 @@
     if (stored.length > 0) {
       return stored.map(x => [
         x.title || 'Project',
-        x.cat || 'Completed',
+        x.location || (['Completed', 'Ongoing', 'Elevation', 'Interior'].includes(x.cat) ? '' : x.cat) || 'Bengaluru',
         '#1a1f27',
         0,
         x.img || x.url
